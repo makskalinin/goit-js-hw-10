@@ -1,71 +1,78 @@
 import './css/styles.css';
 import debounce from 'lodash.debounce';
 import Notiflix from 'notiflix';
-
- const countriesMarkup = function (markup) {
-    document.querySelector('.country-list').innerHTML = markup;
-  };
-  
-const oneCountryMarkup = function (markup) {
-    document.querySelector('.country-info').innerHTML = markup;
-  };
+import {fetchCountries} from "./js/fetchCountries";
 
 const DEBOUNCE_DELAY = 300;
 
-const searchInput = document.querySelector('#search-box');
-
-searchInput.addEventListener('input', debounce(showCountries, DEBOUNCE_DELAY));
-
-function showCountries() {
-  if (searchInput.value.trim() === '') {
-    countriesMarkup(' ');
-    oneCountryMarkup(' ');
-    return;
-  }
-  fetchCountries(searchInput.value.trim());
+const refs = {
+    countryInput: document.querySelector("#search-box"),
+    countryList: document.querySelector('.country-list'),
+    countryInfo: document.querySelector('.country-info'),
 }
 
-const fetchCountries = function (name) {
-    fetch(
-      `https:restcountries.com/v3.1/name/${name}?fields=name,flags,capital,population,languages,`
-    )
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(response.status);
-        }
-        return response.json();
-      })
-      .then(name => {
-        let markup = '';
-  
-        if (name.length > 10) {
-          countriesMarkup(markup);
-          oneCountryMarkup(markup);
-          Notiflix.Notify.info('Too many matches found. Please enter a more specific name.');
-          return;
-        }
-  
-        if (name.length === 1) {
-          countriesMarkup(markup);
-          markup += `<p><img src="${name[0].flags.svg}" width="50" alt="Flag of ${
-            name[0].name.official
-          }"><span class="text">${name[0].name.official}</span></p>
-          <p><span class="text">Capital:</span> ${name[0].capital[0]}</p>
-          <p><span class="text">Population:</span> ${name[0].population}</p>
-          <p><span class="text">Languages:</span> ${Object.values(name[0].languages).join(', ')}</p>`;
-          oneCountryMarkup(markup);
-          return;
-        }
-  
-        oneCountryMarkup(markup);
-        name.map(({ flags: { svg: flagLink }, name: { official: countryName } }) => {
-          markup += `<li class="country-item"><img src="${flagLink}" width="30" alt="Flag of ${countryName}">${countryName}</li>`;
-        });
-        countriesMarkup(markup);
-      })
-      .catch(error => {
-        Notiflix.Notify.failure('Oops, there is no country with that name');
-      });
-  };
+fetchCountries();
+refs.countryInput.addEventListener('input', debounce(searchCountry, DEBOUNCE_DELAY));
 
+function searchCountry() {
+  const inputText = refs.countryInput.value.trim();
 
+  clear()
+
+  if (!inputText) {
+    return;
+    }
+    
+  fetchCountries(inputText)
+    .then(countries => {
+      if (countries.status === 404) {
+        Notiflix.Notify.failure("Oops, there is no country with that name");
+        return;
+      }
+      if (countries.length > 10) {
+        Notiflix.Notify.info("Too many matches found. Please enter a more specific name.")
+        return;
+      }
+      if (countries.length > 1) {
+        markupCountries(countries);
+        return;
+      }
+      markupOneCountry(countries);
+    })
+    .catch(error => console.log(error));
+};
+
+function markupCountries(countries) {
+  refs.countryInfo.innerHTML = '';
+  const markup = countries
+    .map(country => {
+      return `<li class="country-list--item">
+                <img src='${country.flag}' alt='${country.name} flag' width='40' />
+                <p>${country.name}</p>
+              </li>`;
+    })
+    .join('');
+      refs.countryInfo.innerHTML = markup;
+};
+
+function markupOneCountry(country) {
+  refs.countryList.innerHTML = '';
+  const markup = country
+    .map(country => {
+      return `<div class="country">
+                <img src='${country.flag}' alt='${country.name} flag' width='70' />
+                <h2 class="country_name">${country.name}</h2>
+              </div>
+            <ul>
+                <li>Capital: ${country.capital}</span></li>
+                <li>Population: ${country.population}</span></li>
+                <li>Languages: ${country.languages.map(item => ` ${item.name}`)}</span></li>
+            </ul>`
+    })
+    refs.countryInfo.innerHTML = markup;
+};
+
+function clear() {
+  refs.countryInput.innerHTML = '';
+  refs.countryList.innerHTML = '';
+}
